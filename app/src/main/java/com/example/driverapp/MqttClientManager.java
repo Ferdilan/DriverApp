@@ -248,8 +248,22 @@ public class MqttClientManager {
     public void subscribe(String topic, int qos) {
 
         if (client == null || !client.isConnected()) {
-
             Log.w(TAG, "Tidak dapat berlangganan, klien tidak terhubung.");
+        }
+        try {
+            client.subscribe(topic, qos, null, new IMqttActionListener() {
+                @Override
+                public void onSuccess(IMqttToken asyncActionToken) {
+                    Log.d(TAG, "SUKSES Subscribe ke: " + topic);
+                }
+
+                @Override
+                public void onFailure(IMqttToken asyncActionToken, Throwable exception) {
+                    Log.e(TAG, "GAGAL Subscribe ke: " + topic, exception);
+                }
+            });
+        } catch (MqttException e) {
+            Log.e(TAG, "Error saat berlangganan", e);
         }
     }
 

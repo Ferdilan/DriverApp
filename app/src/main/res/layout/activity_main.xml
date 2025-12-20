@@ -1,66 +1,61 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="24dp"
-    android:gravity="center_horizontal">
+    android:layout_height="match_parent">
 
-    <TextView
-        android:id="@+id/tvWelcome"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Halo, Driver"
-        android:textSize="22sp"
-        android:textStyle="bold"
-        android:layout_marginTop="20dp"/>
-
-    <TextView
-        android:id="@+id/tvPlat"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="B 1234 XX"
-        android:textSize="16sp"
-        android:color="#666"/>
-
-    <View
+    <fragment
+        android:id="@+id/mapHome"
+        android:name="com.google.android.gms.maps.SupportMapFragment"
         android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="#DDD"
-        android:layout_marginVertical="30dp"/>
+        android:layout_height="match_parent" />
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="STATUS OPERASIONAL"
-        android:letterSpacing="0.1"
-        android:textSize="14sp"/>
-
-    <androidx.appcompat.widget.SwitchCompat
-        android:id="@+id/switchStatus"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:scaleX="1.5"
-        android:scaleY="1.5"
-        android:layout_marginTop="20dp"/>
-
-    <TextView
-        android:id="@+id/tvStatusLabel"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="OFFLINE"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        android:textColor="#F44336"
-        android:layout_marginTop="16dp"/>
-
-    <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
-
-    <Button
-        android:id="@+id/btnLogout"
+    <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="KELUAR (LOGOUT)"
-        android:backgroundTint="#F44336"/>
+        android:layout_alignParentBottom="true"
+        android:layout_margin="16dp"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="8dp"
+        xmlns:app="http://schemas.android.com/apk/res-auto">
 
-</LinearLayout>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <TextView
+                android:id="@+id/tvWelcome"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Halo, Driver"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="12dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Status Operasional:"
+                android:textColor="#757575"
+                android:layout_marginBottom="4dp"/>
+
+            <Spinner
+                android:id="@+id/spinnerStatus"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:background="@android:drawable/btn_dropdown"
+                android:spinnerMode="dropdown"/>
+
+            <Button
+                android:id="@+id/btnLogout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="KELUAR (LOGOUT)"
+                android:backgroundTint="#D32F2F"
+                android:layout_marginTop="16dp"/>
+
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+</RelativeLayout>

@@ -114,14 +114,29 @@ public class LocationService extends Service {
 
         // Opsional: Set Listener jika nanti butuh terima order (T6)
         mqttManager.setListener((topic, message) -> {
+            String payload = new String(message.getPayload());
+
             Log.d(TAG, "Pesan masuk: " + message.toString());
-            // Nanti kita tambahkan logika terima order di sini
+
+            // Jika topik mengandung 'tugas', berarti ada order masuk!
+            if (topic.contains("ambulans/tugas/")) {
+                showIncomingOrderUI(payload);
+            }
         });
 
         // Subscribe ke topik tugas pribadi driver
         if(driverId != -1) {
             mqttManager.setSubscriptionTopic("ambulans/tugas/" + driverId);
         }
+    }
+
+    // Fungsi untuk membuka layar Popup dari Background Service
+    private void showIncomingOrderUI(String jsonPayload) {
+        Intent intent = new Intent(this, IncomingOrderActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); // Wajib dari Service
+        intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP); // Agar tidak double
+        intent.putExtra("PAYLOAD", jsonPayload);
+        startActivity(intent);
     }
 
     private void startLocationUpdates() {
