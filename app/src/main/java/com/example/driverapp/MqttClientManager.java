@@ -117,6 +117,7 @@ public class MqttClientManager {
                 });
     }
 
+    // disconnect
     public void disconnect() {
         if (client != null) {
             client.disconnect();
