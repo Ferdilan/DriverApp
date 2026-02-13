@@ -3,8 +3,6 @@ package com.example.driverapp;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
-import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -14,9 +12,8 @@ import android.widget.Button;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
-//import androidx.annotation.NonNull;
+
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.SwitchCompat;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
@@ -26,17 +23,20 @@ import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
 
-import java.util.ArrayList;
-import java.util.List;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback {
 
+    private static final String TAG = "MainActivityDriver";
     private GoogleMap mMap;
     private SessionManager session;
     private Spinner spinnerStatus;
-    private boolean isMapReady = false;
+
+    // --- 1. Tambahkan Variabel MQTT ---
+    private MqttClientManager mqttManager;
+
     private static final int PERMISSIONS_REQUEST_CODE = 100;
-//    private SessionManager session;
 
     // Pilihan Status sesuai Enum Database
     private String[] statusOptions = {"OFFLINE (Tidak Aktif)", "AVAILABLE (Siaga)", "BUSY (Sibuk)"};
@@ -46,20 +46,16 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        // Cek Metadata API Key (Opsional, untuk debug)
         try {
-            android.content.pm.ApplicationInfo appInfo = getPackageManager().getApplicationInfo(getPackageName(), android.content.pm.PackageManager.GET_META_DATA);
+            android.content.pm.ApplicationInfo appInfo = getPackageManager().getApplicationInfo(getPackageName(), PackageManager.GET_META_DATA);
             Bundle bundle = appInfo.metaData;
-
             if (bundle != null) {
                 String apiKey = bundle.getString("com.google.android.geo.API_KEY");
-                Log.e("CEK_KEY", "KUNCI YANG DIBACA APLIKASI: " + apiKey);
-            } else {
-                Log.e("CEK_KEY", "Bundle Metadata KOSONG/NULL");
+                Log.d("CEK_KEY", "API Key Found: " + (apiKey != null));
             }
-        } catch (android.content.pm.PackageManager.NameNotFoundException e) {
-            Log.e("CEK_KEY", "Gagal membaca paket aplikasi", e);
-        } catch (NullPointerException e) {
-            Log.e("CEK_KEY", "Error Null Pointer", e);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
 
         session = new SessionManager(getApplicationContext());
@@ -67,6 +63,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             goToLogin();
             return;
         }
+
+        // --- 2. Inisialisasi MQTT Manager ---
+        mqttManager = MqttClientManager.getInstance();
 
         // Setup UI
         TextView tvWelcome = findViewById(R.id.tvWelcome);
@@ -97,9 +96,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerStatus.setAdapter(adapter);
 
-        // Set status awal berdasarkan Service berjalan atau tidak
+        // Set status awal
         if (LocationService.isServiceRunning) {
             spinnerStatus.setSelection(1); // AVAILABLE
+            // Jika service jalan, berarti harusnya kita konek MQTT juga
+            connectAndSubscribeOrder();
         } else {
             spinnerStatus.setSelection(0); // OFFLINE
         }
@@ -107,6 +108,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         spinnerStatus.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                // Hindari trigger saat inisialisasi awal
                 handleStatusChange(position);
             }
 
@@ -116,32 +118,116 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     private void handleStatusChange(int position) {
+        String statusToSend = "offline"; // Default
+
         switch (position) {
             case 0: // OFFLINE
+                statusToSend = "offline";
                 stopLocationService();
-                Toast.makeText(this, "Anda OFFLINE. Tidak akan menerima order.", Toast.LENGTH_SHORT).show();
+
+                // --- 3. Putus Koneksi MQTT saat Offline ---
+                if (mqttManager != null) mqttManager.disconnect();
+
+                Toast.makeText(this, "Anda OFFLINE", Toast.LENGTH_SHORT).show();
                 break;
+
             case 1: // AVAILABLE
+                statusToSend = "available";
                 if (checkPermissions()) {
                     startLocationService();
-                    Toast.makeText(this, "Status: SIAGA (Menunggu Order)", Toast.LENGTH_SHORT).show();
+
+                    // --- 4. Konek & Subscribe saat Available ---
+                    connectAndSubscribeOrder();
+
+                    Toast.makeText(this, "Status: SIAGA (Online)", Toast.LENGTH_SHORT).show();
                 } else {
-                    spinnerStatus.setSelection(0); // Balik ke offline jika izin ditolak
+                    spinnerStatus.setSelection(0);
+                    return;
                 }
                 break;
+
             case 2: // BUSY
-                // Biasanya status ini otomatis dari sistem, tapi driver bisa set manual jika istirahat
-                // Tetap nyalakan service tracking, tapi server tidak akan kasih order baru
+                statusToSend = "busy";
+                // Tetap nyalakan service tracking
                 if (checkPermissions()) startLocationService();
-                Toast.makeText(this, "Status: SIBUK (Tracking Tetap Jalan)", Toast.LENGTH_SHORT).show();
+
+                // Saat Busy, kita tetap konek MQTT (untuk kirim lokasi),
+                // tapi mungkin server tidak akan kirim order baru.
+                if (!mqttManager.isConnected()) connectAndSubscribeOrder();
+
+                Toast.makeText(this, "Status: SIBUK", Toast.LENGTH_SHORT).show();
                 break;
+        }
+        updateOperationalStatus(statusToSend);
+    }
+
+    // --- 5. Logika Koneksi & Terima Order ---
+    private void connectAndSubscribeOrder() {
+        if (mqttManager.isConnected()) {
+            subscribeToOrders(); // Jika sudah konek, langsung subscribe
+            return;
+        }
+
+        mqttManager.connect(new MqttClientManager.ConnectionListener() {
+            @Override
+            public void onSuccess() {
+                Log.d(TAG, "MQTT Connected");
+                runOnUiThread(() -> {
+                    // Update UI jika perlu (misal ikon sinyal hijau)
+                    subscribeToOrders();
+                });
+            }
+
+            @Override
+            public void onError(String errorMessage) {
+                Log.e(TAG, "MQTT Error: " + errorMessage);
+                runOnUiThread(() -> Toast.makeText(MainActivity.this, "Gagal Konek Server", Toast.LENGTH_SHORT).show());
+            }
+        });
+    }
+
+    private void subscribeToOrders() {
+        // Topik Order Umum (Bisa diubah jadi spesifik per driver jika backend support)
+        String topicOrder = "panggilan/masuk";
+
+        mqttManager.subscribe(topicOrder, (topic, message) -> {
+            Log.d(TAG, "Order Masuk: " + message);
+
+            // Parsing data order dan buka IncomingOrderActivity
+            processIncomingOrder(message);
+        });
+    }
+
+    private void processIncomingOrder(String jsonPayload) {
+        try {
+            JSONObject json = new JSONObject(jsonPayload);
+
+            // Ambil data penting
+            int idPasien = json.optInt("id_pasien", -1);
+            double latPasien = json.optDouble("lokasi_pasien_lat", 0.0);
+            double lonPasien = json.optDouble("lokasi_pasien_lon", 0.0);
+            String jenisLayanan = json.optString("jenis_layanan", "Transport");
+
+            // Buka Activity Pop-up Order
+            Intent intent = new Intent(MainActivity.this, IncomingOrderActivity.class);
+            intent.putExtra("ID_PASIEN", idPasien);
+            intent.putExtra("LAT_PASIEN", latPasien);
+            intent.putExtra("LON_PASIEN", lonPasien);
+            intent.putExtra("JENIS_LAYANAN", jenisLayanan);
+
+            // Flag agar activity muncul di atas meskipun aplikasi sedang diminimize (opsional)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+            startActivity(intent);
+
+        } catch (JSONException e) {
+            Log.e(TAG, "JSON Error: " + e.getMessage());
         }
     }
 
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
-        isMapReady = true;
         updateMapUI();
     }
 
@@ -158,12 +244,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
 
             if (allGranted) {
-                // Jika diizinkan, otomatis set ke AVAILABLE dan nyalakan service
                 spinnerStatus.setSelection(1);
                 startLocationService();
-                updateMapUI(); // Munculkan Blue Dot
+                connectAndSubscribeOrder(); // Konek MQTT juga
+                updateMapUI();
             } else {
-                // Jika ditolak, paksa ke OFFLINE
                 Toast.makeText(this, "Izin Lokasi diperlukan!", Toast.LENGTH_LONG).show();
                 spinnerStatus.setSelection(0);
             }
@@ -175,9 +260,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         try {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                     == PackageManager.PERMISSION_GRANTED) {
-                mMap.setMyLocationEnabled(true); // Blue Dot Muncul!
-
-                // Fokus awal ke Malang (Bisa diganti lokasi terakhir driver)
+                mMap.setMyLocationEnabled(true);
+                // Default ke lokasi Malang (Bisa diganti)
                 LatLng malang = new LatLng(-7.9666, 112.6326);
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(malang, 12));
             }
@@ -205,7 +289,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 100);
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, PERMISSIONS_REQUEST_CODE);
             return false;
         }
         return true;
@@ -213,6 +297,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private void logout() {
         stopLocationService();
+        if (mqttManager != null) mqttManager.disconnect();
         session.logoutUser();
         goToLogin();
     }
@@ -223,4 +308,42 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         startActivity(intent);
         finish();
     }
+
+    private void updateOperationalStatus(String statusString) {
+        // GANTI URL SESUAI IP ANDA (Pastikan Laptop & HP di Wifi sama)
+        String url = "http://192.168.0.104:3000/api/driver/status";
+
+        // Format huruf besar ("available" -> "Available") agar sesuai ENUM DB
+        String statusFinal = statusString.substring(0, 1).toUpperCase() + statusString.substring(1).toLowerCase();
+
+        JSONObject jsonBody = new JSONObject();
+        try {
+            jsonBody.put("id_ambulans", session.getDriverId());
+            jsonBody.put("status", statusFinal);
+        } catch (Exception e) { e.printStackTrace(); }
+
+        okhttp3.RequestBody body = okhttp3.RequestBody.create(
+                jsonBody.toString(),
+                okhttp3.MediaType.parse("application/json; charset=utf-8")
+        );
+
+        okhttp3.Request request = new okhttp3.Request.Builder()
+                .url(url)
+                .put(body)
+                .build();
+
+        new Thread(() -> {
+            okhttp3.OkHttpClient client = new okhttp3.OkHttpClient();
+            try {
+                okhttp3.Response response = client.newCall(request).execute();
+                if (response.isSuccessful()) {
+                    Log.d("UpdateStatus", "Sukses update ke DB: " + statusFinal);
+                } else {
+                    Log.e("UpdateStatus", "Gagal update: " + response.code());
+                }
+            } catch (Exception e) {
+                Log.e("UpdateStatus", "Error koneksi", e);
+            }
+        }).start();
     }
+}

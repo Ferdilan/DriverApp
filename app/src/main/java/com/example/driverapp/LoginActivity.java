@@ -26,7 +26,7 @@ public class LoginActivity extends AppCompatActivity {
 
     // GANTI IP INI DENGAN IP KOMPUTER ANDA YANG MENJALANKAN 'ambulance-admin'
     // Jangan gunakan 'localhost' di Android Emulator, gunakan '10.0.2.2' atau IP LAN asli
-    private static final String LOGIN_URL = "http://192.168.100.133:3000/api/driver/login";
+    private static final String LOGIN_URL = "http://192.168.0.101:3000/api/driver/login";
     private static final String REGISTER_URL = "http://192.168.100.133:3000/driver/register";
 
     @Override

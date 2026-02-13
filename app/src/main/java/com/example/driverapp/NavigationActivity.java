@@ -1,6 +1,7 @@
 package com.example.driverapp;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.os.Bundle;
@@ -81,6 +82,18 @@ public class NavigationActivity extends FragmentActivity implements OnMapReadyCa
         Button btnSelesai = findViewById(R.id.btnSelesaiTugas);
         btnSelesai.setOnClickListener(v -> {
             selesaikanTugas();
+
+            // 1. Beritahu Server: Tugas Selesai, kembali SIAGA
+            updateOperationalStatus("Available");
+
+            Toast.makeText(this, "Pengantaran Selesai. Kembali Siaga.", Toast.LENGTH_SHORT).show();
+
+            // 2. Kembali ke Dashboard Utama
+            Intent intent = new Intent(NavigationActivity.this, MainActivity.class);
+            // Hapus history agar tombol Back tidak kembali ke navigasi
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+            finish();
         });
     }
 
@@ -204,13 +217,56 @@ public class NavigationActivity extends FragmentActivity implements OnMapReadyCa
         });
     }
 
+    // Method untuk mengirim update status ke Server/Database
+    private void updateOperationalStatus(String statusString) {
+        // GANTI URL INI DENGAN ALAMAT SERVER ANDA
+        // Pastikan endpoint backend untuk update status driver sudah ada
+        String url = "http://192.168.0.189:3000/api/driver/status";
+
+        // 2. Format Data ("busy" -> "Busy") untuk menghindari error ENUM database
+//        String statusFinal = statusRaw.substring(0, 1).toUpperCase() + statusRaw.substring(1).toLowerCase();
+        // Siapkan Body JSON
+        JSONObject jsonBody = new JSONObject();
+        try {
+            jsonBody.put("id_ambulans", session.getDriverId()); // ID Driver/Ambulans
+            jsonBody.put("status", statusString); // 'offline', 'available', atau 'busy'
+        } catch (Exception e) { e.printStackTrace(); }
+
+        // Buat Request
+        okhttp3.RequestBody body = okhttp3.RequestBody.create(
+                jsonBody.toString(),
+                okhttp3.MediaType.parse("application/json; charset=utf-8")
+        );
+
+        okhttp3.Request request = new okhttp3.Request.Builder()
+                .url(url)
+                .put(body) // Biasanya update menggunakan PUT atau POST (Tergantung Backend)
+                .build();
+
+        // Eksekusi di Background
+        new Thread(() -> {
+            okhttp3.OkHttpClient client = new okhttp3.OkHttpClient();
+            try {
+                okhttp3.Response response = client.newCall(request).execute();
+                if (response.isSuccessful()) {
+                    Log.d("UpdateStatus", "Sukses update ke DB: " + statusString);
+                    // Opsional: Update UI di thread utama jika perlu
+                } else {
+                    Log.e("UpdateStatus", "Gagal update: " + response.code());
+                }
+            } catch (Exception e) {
+                Log.e("UpdateStatus", "Error koneksi", e);
+            }
+        }).start();
+    }
+
     private void selesaikanTugas() {
         try {
             JSONObject resp = new JSONObject();
             resp.put("id_panggilan", idPanggilan);
             resp.put("id_driver", session.getDriverId());
             resp.put("status", "selesai");
-            mqttManager.publish("ambulans/respons/konfirmasi", resp.toString(), 1);
+            mqttManager.publish("ambulans/respons/konfirmasi", resp.toString());
             Toast.makeText(this, "Tugas Selesai. Kembali Siaga.", Toast.LENGTH_LONG).show();
             finish();
         } catch (JSONException e) { e.printStackTrace(); }

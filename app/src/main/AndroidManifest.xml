@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
-    <!-- Aplikasi ini dibuat untuk perhitungan jarak menggunakan API Maps -->
+
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -23,8 +23,8 @@
         android:usesCleartextTraffic="true">
         <activity
             android:name=".IncomingOrderActivity"
-            android:theme="@style/Theme.AppCompat.Dialog"
-            android:exported="false" />
+            android:exported="false"
+            android:theme="@style/Theme.AppCompat.Dialog" />
         <activity
             android:name=".NavigationActivity"
             android:exported="false" />
@@ -44,8 +44,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="false" /> <!-- service mqtt -->
-        <service android:name="org.eclipse.paho.android.service.MqttService" />
-        
+
         <service
             android:name=".LocationService"
             android:enabled="true"

@@ -14,7 +14,7 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.util.Log;
 
-import androidx.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 
@@ -34,11 +34,6 @@ public class LocationService extends Service {
     private static final String CHANNEL_ID = "DriverLocationChannel";
     private static final int NOTIFICATION_ID = 123;
 
-    // --- KONFIGURASI MQTT CLOUD (Isi sesuai akun HiveMQ/EMQX Anda) ---
-    private static final String MQTT_BROKER_URL = BuildConfig.MQTT_HOST;
-    private static final String MQTT_USERNAME = BuildConfig.MQTT_USERNAME;
-    private static final String MQTT_PASSWORD = BuildConfig.MQTT_PASSWORD;
-
     private FusedLocationProviderClient fusedLocationClient;
     private LocationCallback locationCallback;
     private MqttClientManager mqttManager;
@@ -49,33 +44,27 @@ public class LocationService extends Service {
         super.onCreate();
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
-        // 1. Panggil Singleton Manager Anda
         mqttManager = MqttClientManager.getInstance();
 
-        // 2. Siapkan Callback GPS
         locationCallback = new LocationCallback() {
             @Override
             public void onLocationResult(LocationResult locationResult) {
                 if (locationResult == null) return;
                 for (Location location : locationResult.getLocations()) {
-                    // Setiap dapat lokasi, kirim via Manager
                     publishLocationToCloud(location);
                 }
             }
         };
-
         createNotificationChannel();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // 3. Ambil ID Driver
         if (intent != null && intent.hasExtra("DRIVER_ID")) {
             driverId = intent.getIntExtra("DRIVER_ID", -1);
             Log.d(TAG, "Service Start. Driver ID: " + driverId);
         }
 
-        // 4. Jalankan Notifikasi Foreground (Wajib)
         Intent notificationIntent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
 
@@ -100,33 +89,36 @@ public class LocationService extends Service {
     }
 
     private void connectToMqttCloud() {
-        // Buat Client ID Unik
-        String clientId = "DriverApp_" + driverId + "_" + System.currentTimeMillis();
+        // Cek dulu apakah sudah konek (agar tidak double connect)
+        if (mqttManager.isConnected()) {
+            subscribeToTasks();
+            return;
+        }
 
-        // Panggil fungsi connect dari MqttClientManager Anda
-        mqttManager.connect(
-                this,
-                MQTT_BROKER_URL,
-                clientId,
-                MQTT_USERNAME,
-                MQTT_PASSWORD
-        );
+        // PERUBAHAN: Gunakan connect() tanpa parameter user/pass (sudah di Manager)
+        mqttManager.connect(new MqttClientManager.ConnectionListener() {
+            @Override
+            public void onSuccess() {
+                Log.d(TAG, "Service: MQTT Connected");
+                subscribeToTasks();
+            }
 
-        // Opsional: Set Listener jika nanti butuh terima order (T6)
-        mqttManager.setListener((topic, message) -> {
-            String payload = new String(message.getPayload());
-
-            Log.d(TAG, "Pesan masuk: " + message.toString());
-
-            // Jika topik mengandung 'tugas', berarti ada order masuk!
-            if (topic.contains("ambulans/tugas/")) {
-                showIncomingOrderUI(payload);
+            @Override
+            public void onError(String errorMessage) {
+                Log.e(TAG, "Service: MQTT Connect Error -> " + errorMessage);
             }
         });
+    }
 
-        // Subscribe ke topik tugas pribadi driver
-        if(driverId != -1) {
-            mqttManager.setSubscriptionTopic("ambulans/tugas/" + driverId);
+    private void subscribeToTasks() {
+        // PERUBAHAN: Subscribe tugas spesifik untuk driver ini
+        if (driverId != -1) {
+            String topicTugas = "ambulans/tugas/" + driverId;
+
+            mqttManager.subscribe(topicTugas, (topic, message) -> {
+                Log.d(TAG, "Tugas Pribadi Masuk: " + message);
+                showIncomingOrderUI(message);
+            });
         }
     }
 
@@ -159,13 +151,14 @@ public class LocationService extends Service {
             payload.put("lokasi_latitude", location.getLatitude());
             payload.put("lokasi_longitude", location.getLongitude());
 
-            // Tentukan Topik (Sesuai Server service.js Anda)
-            // Topik: ambulans/lokasi/update/{id_driver}
+            // Tambahkan Bearing (Arah) agar rotasi mobil di peta pasien mulus
+            payload.put("bearing", location.getBearing());
+
             String topic = "ambulans/lokasi/update/" + driverId;
 
             // Kirim via Manager Anda
             // QoS 0 = Fire and forget (Cepat)
-            mqttManager.publish(topic, payload.toString(), 0);
+            mqttManager.publish(topic, payload.toString());
 
             Log.d(TAG, "Sent Cloud: " + payload.toString());
 
@@ -192,10 +185,14 @@ public class LocationService extends Service {
     public void onDestroy() {
         super.onDestroy();
         isServiceRunning = false;
-        fusedLocationClient.removeLocationUpdates(locationCallback);
+        if (fusedLocationClient != null && locationCallback != null) {
+            fusedLocationClient.removeLocationUpdates(locationCallback);
+        }
 
-        // Putus koneksi saat service mati
-        mqttManager.disconnect();
+        // Opsional: Matikan MQTT saat service mati
+        if (mqttManager != null) {
+            mqttManager.disconnect();
+        }
     }
 
     @Nullable
