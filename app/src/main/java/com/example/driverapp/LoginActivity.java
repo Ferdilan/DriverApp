@@ -26,12 +26,13 @@ public class LoginActivity extends AppCompatActivity {
 
     // GANTI IP INI DENGAN IP KOMPUTER ANDA YANG MENJALANKAN 'ambulance-admin'
     // Jangan gunakan 'localhost' di Android Emulator, gunakan '10.0.2.2' atau IP LAN asli
-    private static final String LOGIN_URL = "http://192.168.0.101:3000/api/driver/login";
+    private static final String LOGIN_URL = "http://192.168.100.133:3000/api/driver/login";
     private static final String REGISTER_URL = "http://192.168.100.133:3000/driver/register";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_login);
 
         // 1. CEK SESI TERLEBIH DAHULU (Fitur Login Sekali)
         session = new SessionManager(getApplicationContext());
@@ -41,13 +42,10 @@ public class LoginActivity extends AppCompatActivity {
             return; // Hentikan proses onCreate
         }
 
-        setContentView(R.layout.activity_login);
-
         // Inisialisasi UI
         etEmail = findViewById(R.id.etEmail);
         etPassword = findViewById(R.id.etPassword);
         btnLogin = findViewById(R.id.btnLogin);
-        btnRegisterWeb = findViewById(R.id.btnRegisterWeb);
         progressBar = findViewById(R.id.progressBar);
 
         // Aksi Tombol Login
