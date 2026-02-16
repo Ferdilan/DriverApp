@@ -46,6 +46,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        androidx.appcompat.widget.Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+
         // Cek Metadata API Key (Opsional, untuk debug)
         try {
             android.content.pm.ApplicationInfo appInfo = getPackageManager().getApplicationInfo(getPackageName(), PackageManager.GET_META_DATA);
@@ -268,6 +271,28 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         } catch (SecurityException e) {
             Log.e("Map", "Izin Lokasi Error: " + e.getMessage());
         }
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(android.view.Menu menu) {
+        getMenuInflater().inflate(R.menu.main_menu, menu);
+        return true; // Harus return true agar menu muncul
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(android.view.MenuItem item) {
+        int id = item.getItemId();
+
+        if (id == R.id.menu_profile) {
+            // Buka Halaman Profil
+            startActivity(new Intent(this, ProfileActivity.class));
+            return true;
+        } else if (id == R.id.menu_history) {
+            // Buka Halaman Riwayat
+//            startActivity(new Intent(this, HistoryActivity.class));
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     private void startLocationService() {
