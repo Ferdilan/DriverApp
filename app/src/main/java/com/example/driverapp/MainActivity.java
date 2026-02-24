@@ -190,13 +190,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     private void subscribeToOrders() {
-        // Topik Order Umum (Bisa diubah jadi spesifik per driver jika backend support)
-        String topicOrder = "panggilan/masuk";
 
+        String topicOrder = "ambulans/tugas/";
         mqttManager.subscribe(topicOrder, (topic, message) -> {
             Log.d(TAG, "Order Masuk: " + message);
-
-            // Parsing data order dan buka IncomingOrderActivity
             processIncomingOrder(message);
         });
     }

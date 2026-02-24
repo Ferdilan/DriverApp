@@ -3,6 +3,8 @@ package com.example.driverapp;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import java.util.HashMap;
+
 public class SessionManager {
     private SharedPreferences pref;
     private SharedPreferences.Editor editor;
@@ -19,6 +21,7 @@ public class SessionManager {
     public static final String KEY_ID = "id_ambulans";
     public static final String KEY_NAMA = "nama_driver";
     public static final String KEY_KATEGORI = "kategori";
+    public static final String KEY_NIK = "nik";
 
     // Constructor
     public SessionManager(Context context) {
@@ -44,6 +47,14 @@ public class SessionManager {
      */
     public boolean isLoggedIn(){
         return pref.getBoolean(IS_LOGIN, false);
+    }
+
+    public HashMap<String, String> getUserDetails(){
+        HashMap<String, String> user = new HashMap<>();
+        user.put(KEY_ID, pref.getString(KEY_ID, null));
+        user.put(KEY_NAMA, pref.getString(KEY_NAMA, null));
+        user.put(KEY_NIK, pref.getString(KEY_NIK, null));
+        return user;
     }
 
     /**

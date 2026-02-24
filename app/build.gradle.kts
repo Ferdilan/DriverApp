@@ -17,6 +17,7 @@ android {
 
     buildFeatures {
         buildConfig = true
+        viewBinding = true
     }
 
     defaultConfig {
@@ -76,6 +77,10 @@ dependencies {
     implementation("androidx.annotation:annotation:1.7.1")
     implementation("org.jetbrains:annotations:23.0.0")
 
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.9.0")
+
     // Android Standard Libs
     implementation(libs.appcompat)
     implementation(libs.material)
@@ -84,6 +89,8 @@ dependencies {
     implementation(libs.annotations)
     implementation(libs.annotations)
     implementation(libs.annotations)
+    implementation(libs.navigation.fragment)
+    implementation(libs.navigation.ui)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)

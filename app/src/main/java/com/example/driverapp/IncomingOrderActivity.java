@@ -47,14 +47,6 @@ public class IncomingOrderActivity extends AppCompatActivity {
             // 1. Beritahu Server: Driver ini sekarang SIBUK
             updateOperationalStatus("Busy");
 
-            // 2. Pindah ke Halaman Navigasi
-            Intent intent = new Intent(IncomingOrderActivity.this, NavigationActivity.class);
-
-            // (Opsional) Bawa data lokasi pasien
-            intent.putExtra("LAT_PASIEN", latPasien);
-            intent.putExtra("LON_PASIEN", lonPasien);
-
-            startActivity(intent);
             finish(); // Tutup halaman incoming agar tidak bisa back
         });
 
@@ -88,26 +80,9 @@ public class IncomingOrderActivity extends AppCompatActivity {
             latPasien = data.optDouble("lokasi_pasien_lat", -7.983908);
             lonPasien = data.optDouble("lokasi_pasien_lon", 112.621391);
 
-            // =================================================================
-            // MODE: DATA DUMMY (TESTING 1 HP)
-            // Aktifkan blok di bawah ini HANYA jika Anda testing sendirian (1 HP)
-            // =================================================================
-            /*
-            // --- MULAI DUMMY ---
-            latPasien = -7.9440736; // Lokasi Palsu (Jauh dari posisi Anda)
-            lonPasien = 112.6145613;
-            namaPasienStr = "Pasien Simulasi (Testing)";
-            jarak = "Jarak: Simulasi";
-            // --- SELESAI DUMMY ---
-            */
-
             // Update Tampilan UI
             tvNamaPasien.setText(namaPasienStr);
             tvJarak.setText(jarak);
-
-            // --- REKAYASA KOORDINAT UNTUK TESTING SATU HP ---
-            // Tujuannya: Agar lokasi pasien berbeda dari lokasi Anda (Driver)
-            // Ganti angka ini dengan koordinat yang Anda dapat dari Google Maps tadi!
 
         } catch (JSONException e) {
             e.printStackTrace();
@@ -138,6 +113,7 @@ public class IncomingOrderActivity extends AppCompatActivity {
                 intent.putExtra("LON_PASIEN", lonPasien);
                 intent.putExtra("NAMA_PASIEN", namaPasienStr);
                 intent.putExtra("ID_PANGGILAN", idPanggilan);
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
                 startActivity(intent);
             }
             finish();
@@ -152,7 +128,7 @@ public class IncomingOrderActivity extends AppCompatActivity {
     private void updateOperationalStatus(String statusString) {
         // GANTI URL INI DENGAN ALAMAT SERVER ANDA
         // Pastikan endpoint backend untuk update status driver sudah ada
-        String url = "http://192.168.0.189:3000/api/driver/status";
+        String url = "http://192.168.100.133:3000/api/driver/status";
 
         // 2. Format Data ("busy" -> "Busy") untuk menghindari error ENUM database
 //        String statusFinal = statusRaw.substring(0, 1).toUpperCase() + statusRaw.substring(1).toLowerCase();
@@ -160,6 +136,7 @@ public class IncomingOrderActivity extends AppCompatActivity {
         JSONObject jsonBody = new JSONObject();
         try {
             jsonBody.put("id_ambulans", session.getDriverId()); // ID Driver/Ambulans
+            jsonBody.put("id_panggilan", idPanggilan); // ID Panggilan (dari server)
             jsonBody.put("status", statusString); // 'offline', 'available', atau 'busy'
         } catch (Exception e) { e.printStackTrace(); }
 

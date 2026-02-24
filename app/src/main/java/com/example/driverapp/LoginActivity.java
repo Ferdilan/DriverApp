@@ -20,7 +20,7 @@ import java.net.URL;
 public class LoginActivity extends AppCompatActivity {
 
     private EditText etEmail, etPassword;
-    private Button btnLogin, btnRegisterWeb;
+    private Button btnLogin;
     private ProgressBar progressBar;
     private SessionManager session;
 
@@ -57,12 +57,6 @@ public class LoginActivity extends AppCompatActivity {
             } else {
                 Toast.makeText(this, "Email dan Password harus diisi", Toast.LENGTH_SHORT).show();
             }
-        });
-
-        // Aksi Tombol Daftar (Buka Browser)
-        btnRegisterWeb.setOnClickListener(v -> {
-            Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(REGISTER_URL));
-            startActivity(browserIntent);
         });
     }
 

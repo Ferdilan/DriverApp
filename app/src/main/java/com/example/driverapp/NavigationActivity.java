@@ -86,7 +86,7 @@ public class NavigationActivity extends FragmentActivity implements OnMapReadyCa
             // 1. Beritahu Server: Tugas Selesai, kembali SIAGA
             updateOperationalStatus("Available");
 
-            Toast.makeText(this, "Pengantaran Selesai. Kembali Siaga.", Toast.LENGTH_SHORT).show();
+//            Toast.makeText(this, "Pengantaran Selesai. Kembali Siaga.", Toast.LENGTH_SHORT).show();
 
             // 2. Kembali ke Dashboard Utama
             Intent intent = new Intent(NavigationActivity.this, MainActivity.class);
@@ -221,13 +221,14 @@ public class NavigationActivity extends FragmentActivity implements OnMapReadyCa
     private void updateOperationalStatus(String statusString) {
         // GANTI URL INI DENGAN ALAMAT SERVER ANDA
         // Pastikan endpoint backend untuk update status driver sudah ada
-        String url = "http://192.168.0.189:3000/api/driver/status";
+        String url = "http://192.168.100.133:3000/api/driver/status";
 
         // 2. Format Data ("busy" -> "Busy") untuk menghindari error ENUM database
 //        String statusFinal = statusRaw.substring(0, 1).toUpperCase() + statusRaw.substring(1).toLowerCase();
         // Siapkan Body JSON
         JSONObject jsonBody = new JSONObject();
         try {
+            jsonBody.put("id_panggilan", idPanggilan); // ID Panggilan (dari server)
             jsonBody.put("id_ambulans", session.getDriverId()); // ID Driver/Ambulans
             jsonBody.put("status", statusString); // 'offline', 'available', atau 'busy'
         } catch (Exception e) { e.printStackTrace(); }
@@ -264,11 +265,12 @@ public class NavigationActivity extends FragmentActivity implements OnMapReadyCa
         try {
             JSONObject resp = new JSONObject();
             resp.put("id_panggilan", idPanggilan);
-            resp.put("id_driver", session.getDriverId());
+            resp.put("id_ambulans", session.getDriverId());
             resp.put("status", "selesai");
             mqttManager.publish("ambulans/respons/konfirmasi", resp.toString());
             Toast.makeText(this, "Tugas Selesai. Kembali Siaga.", Toast.LENGTH_LONG).show();
-            finish();
+//            // JANGAN LANGSUNG FINISH DI SINI JIKA BELUM UPDATE STATUS "AVAILABLE"
+//            finish();
         } catch (JSONException e) { e.printStackTrace(); }
     }
 }
